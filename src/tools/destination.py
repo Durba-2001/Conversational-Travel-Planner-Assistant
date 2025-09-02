@@ -46,6 +46,7 @@ def recommend_destinations(preference: str, budget: float) -> DestinationSuggest
     if parsed is None:
         return DestinationSuggestion(destinations=[], reasoning="Could not generate valid suggestions at this time.")
 
+
     return DestinationSuggestion(
         destinations=parsed.get("destinations", []),
         reasoning=parsed.get("reasoning", "")
