@@ -9,7 +9,7 @@ from src.agent.memory import create_memory
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv, find_dotenv
-
+import json
 # Load env
 load_dotenv(find_dotenv())
 api_key = os.environ.get("GOOGLE_API_KEY")
@@ -64,8 +64,16 @@ memory = create_memory(llm=llm, max_messages=5, summary_token_budget=250)
 sub_agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
 agent_executor = AgentExecutor(agent=sub_agent, tools=tools, memory=memory, verbose=True)
 @tool
-def generate_itinerary(input_data: dict) -> TravelItinerary:
+def generate_itinerary(input_data) -> TravelItinerary:
     """Generate a detailed travel itinerary based on preferences, budget, days, and interest."""
+    # Safely handle both dict and JSON string inputs
+    if isinstance(input_data, str):
+        try:
+            input_data = json.loads(input_data)
+        except Exception as e:
+            raise ValueError(f"Input must be a dict or valid JSON string: {e}")
+
+    # Now input_data is a dictionary
     preference = input_data.get("preference")
     budget = input_data.get("budget")
     days = input_data.get("days")
@@ -83,7 +91,10 @@ def generate_itinerary(input_data: dict) -> TravelItinerary:
     output = response.get("output")
 
     try:
-        itinerary = TravelItinerary.model_validate_json(output)
+        if isinstance(output, str):
+            itinerary = TravelItinerary.model_validate_json(output)
+        else:
+            itinerary = TravelItinerary.model_validate(output)
     except Exception:
         try:
             itinerary = TravelItinerary.model_validate(output)

@@ -1,5 +1,3 @@
-# src/agent/core.py
-
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.prompts import PromptTemplate
@@ -11,6 +9,7 @@ from src.tools.sub_agent import generate_itinerary
 from src.agent.memory import create_memory
 import os
 from dotenv import load_dotenv, find_dotenv
+import json
 
 # Load environment variables
 load_dotenv(find_dotenv())
@@ -19,7 +18,7 @@ api_key = os.environ.get("GOOGLE_API_KEY")
 # Initialize LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
 
-# Define your tools as LangChain Tool objects wrapping your functions
+# Define your tools
 tools = [
     Tool(
         name="Destination Recommender",
@@ -38,7 +37,7 @@ tools = [
     ),
     Tool(
         name="Itinerary Generator",
-        func= generate_itinerary,
+        func=generate_itinerary,
         description="Generates a day-by-day travel itinerary."
     ),
 ]
@@ -53,13 +52,21 @@ You have access to the following tools:
 
 The available tool names are:
 {tool_names}
-Important: When calling a tool, ALWAYS include all required arguments 
-exactly as specified in its schema.
+Important: When you call a tool, ALWAYS output exactly two lines in the following format:
+Action: <tool name>
+Action Input: <JSON-encoded string of input arguments>
+Strictly follow this formatting.
+
 Follow this reasoning process:
-- Thought: consider what to do next
+- Thought: I must consider what to do next. I must either provide a final answer or call a tool.
+- If the user's query is missing key information (e.g., destination, duration, budget, or interests), provide a final answer that clearly and concisely asks for the missing information. DO NOT call a tool.
+- If all necessary information is provided, call the appropriate tool.
 - Action: pick a tool (if needed)
+- Action Input: provide input for the tool, strictly as a JSON-encoded string
 - Observation: record the result
 - Repeat as needed until you can provide the final answer.
+
+Final Answer: A final, single, concise answer to the user's question, or a question asking for more information.
 
 User question: {input}
 
@@ -78,19 +85,28 @@ agent_executor = AgentExecutor(
     tools=tools,
     memory=conversation_memory,
     verbose=True,
-    handle_parsing_errors=True  
+    handle_parsing_errors=True,
+    stop_sequence=['\nObservation:', '\nThought:']
 )
 
-# Entrypoint function to run the agent on user input
+# Updated entrypoint function to run the agent on user input
 def run_agent(preference: str, budget: float, days: int, interest: str):
     """
     Run the travel planner agent with user preferences,
     budget, duration, and interest, and return structured output.
     """
-    user_input = (
-        f"Plan a {preference} trip with a budget of ${budget} for {days} days "
-        f"focusing on {interest} activities."
-    )
-    # Run the agent_executor on the formatted user input
-    response = agent_executor.invoke({"input": user_input})
+    # Create a dictionary with the user's preferences
+    user_preferences = {
+        "preference": preference,
+        "budget": budget,
+        "days": days,
+        "interest": interest,
+    }
+
+    # Format the input as a JSON string for a reliable handoff
+    user_query = json.dumps(user_preferences)
+
+    # Pass the formatted JSON string to the agent's input
+    response = agent_executor.invoke({"input": user_query})
+
     return response.get("output")

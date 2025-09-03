@@ -1,10 +1,9 @@
-
 from src.tools.base import create_llm_chain, safe_parse_json
 from langchain.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from typing import List
 from langchain_core.tools import tool
-
+import json
 
 class DestinationSuggestion(BaseModel):
     destinations: List[str] = Field(
@@ -15,39 +14,37 @@ class DestinationSuggestion(BaseModel):
     )
 
 
-# Prompt for the LLM
 destination_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful travel assistant."),
-    ("user", "Suggest 3 destinations for a {preference} vacation within ${budget}. "
-             "Return the answer strictly in JSON with keys 'destinations' and 'reasoning'.")
+    ("system", "You are a helpful travel assistant. You suggest travel destinations based on user preferences and budget. Return the output in a JSON structure conforming to the DestinationSuggestion schema."),
+    ("user", "Suggest 3 destinations for a {preference} vacation within a ${budget} budget."),
 ])
 
-# Build chain from prompt
-chain = create_llm_chain(destination_prompt)
-
+chain = create_llm_chain(destination_prompt, structured=True, schema=DestinationSuggestion)
 
 @tool
-def recommend_destinations(preference: str, budget: float) -> DestinationSuggestion:
+def recommend_destinations(preference: str, budget: float = None) -> str:
     """
     Suggests travel destinations based on user preference and budget.
 
     Args:
-        preference (str): The type of vacation, e.g., beach, adventure.
+        preference (str): The type of vacation, e.g., 'beach', 'adventure', 'relaxation'.
         budget (float): Available budget in USD.
 
     Returns:
-        DestinationSuggestion: Recommended destinations and reasoning.
+        str: A JSON string of recommended destinations and reasoning.
     """
-    # Invoke the chain and safely parse the JSON output
-    raw_output = chain.invoke({"preference": preference, "budget": budget})
-    parsed = safe_parse_json(raw_output.content)
-    
-    # If parsing fails, return a default/empty object to prevent errors
-    if parsed is None:
-        return DestinationSuggestion(destinations=[], reasoning="Could not generate valid suggestions at this time.")
+    # Check if the preference input is a JSON string containing both values
+    try:
+        data = json.loads(preference)
+        if 'preference' in data and 'budget' in data:
+            preference = data['preference']
+            budget = data['budget']
+    except json.JSONDecodeError:
+        pass  # It's not a JSON string, so we continue with the original preference and budget values
 
+    # Check if the budget is valid before invoking the LLM chain
+    # if not isinstance(budget, (int, float)) or budget <= 0:
+    #     raise ValueError("Budget must be a positive number.")
 
-    return DestinationSuggestion(
-        destinations=parsed.get("destinations", []),
-        reasoning=parsed.get("reasoning", "")
-    )
+    result_obj: DestinationSuggestion = chain.invoke({"preference": preference, "budget": budget})
+    return result_obj.model_dump_json()
