@@ -1,13 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import List
 
-class DayPlan(BaseModel):
-    day: int = Field(description="Day number")
-    activities: List[str] = Field(description="List of activities")
-    estimated_cost: float = Field(description="Cost in USD")
+
+class DailyPlan(BaseModel):
+    duration: int = Field(description="Day number of the trip")
+    activities: List[str] = Field(description="List of activities for this day")
+    estimated_cost: float = Field(description="Estimated cost for the day")
 
 class TravelItinerary(BaseModel):
     destination: str = Field(description="Travel destination")
-    duration_days: int = Field(description="Total days")
+    duration: int = Field(description="Total days")
     total_budget: float = Field(description="Estimated total budget in USD")
-    daily_plans: List[DayPlan] = Field(description="Breakdown by day")
+    daily_plans: List[DailyPlan] = Field(description="Breakdown by day")

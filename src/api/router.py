@@ -9,7 +9,7 @@ import uuid
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-# ✅ Define models for request/response
+#  Define models for request/response
 class ChatMessage(BaseModel):
     preference: str
     budget: float
@@ -31,7 +31,7 @@ async def create_chat(
         itinerary = run_agent(
             preference=message.preference,
             budget=message.budget,
-            days=message.days,
+            duration=message.days,
             interest=message.interest,
         )
     except Exception as e:
@@ -76,7 +76,7 @@ async def continue_chat(
         itinerary = run_agent(
             preference=message.preference,
             budget=message.budget,
-            days=message.days,
+            duration=message.days,
             interest=message.interest,
         )
     except Exception as e:

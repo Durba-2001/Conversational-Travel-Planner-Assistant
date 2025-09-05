@@ -47,4 +47,4 @@ def recommend_destinations(preference: str, budget: float = None) -> str:
     #     raise ValueError("Budget must be a positive number.")
 
     result_obj: DestinationSuggestion = chain.invoke({"preference": preference, "budget": budget})
-    return result_obj.model_dump_json()
+    return result_obj.model_dump_json(indent=2)

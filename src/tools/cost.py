@@ -1,94 +1,97 @@
+import json
 from pydantic import BaseModel, Field, field_validator
 from langchain.prompts import ChatPromptTemplate
 from src.tools.base import create_llm_chain
 from langchain_core.tools import tool
-import json
 
+# Pydantic model for structured cost estimation
 class CostEstimate(BaseModel):
     destination: str = Field(description="Selected destination")
-    days: int = Field(description="Number of days")
+    duration: int = Field(description="Number of days")
     total_cost: float = Field(description="Estimated total cost in USD")
     breakdown: dict = Field(description="Cost components")
 
     @field_validator('breakdown', mode='before')
     def parse_breakdown(cls, v):
         """
-        Parses the breakdown from a string into a dictionary.
-        Handles both valid JSON and a custom 'key: value, ...' format.
+        Validator to handle different input formats for the breakdown.
+        It attempts to parse the input as a JSON dictionary, a Python-style dictionary
+        with single quotes, or a simple 'key: value' string.
         """
-        try:
-            # First, try to parse as valid JSON
-            if v:
-                return json.loads(v)
-            else:
-                raise ValueError("Breakdown must be a valid JSON dictionary string, but an empty string was provided.")
-        except (json.JSONDecodeError, TypeError):
-            # If JSON parsing fails, try to handle the custom format without regex
-            try:
-                parsed_dict = {}
-                pairs = v.split(',')
-                for pair in pairs:
-                    key_value = pair.split(':', 1)
-                    if len(key_value) == 2:
-                        key = key_value[0].strip()
-                        value = key_value[1].strip()
-                        parsed_dict[key] = float(value)
-                return parsed_dict
-            except (ValueError, IndexError):
-                raise ValueError("Breakdown must be a valid JSON dictionary string or a simple 'key: value' string.")
+        if not v:
+            raise ValueError("Breakdown must be a JSON dictionary string, but an empty string was provided.")
 
-# Prompt template tells LLM what to produce
+        # Return dicts as is (already valid)
+        if isinstance(v, dict):
+            return v
+
+        if isinstance(v, str):
+            try:
+                # Try parsing as proper JSON first
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # Fallback to try fixing single quotes from Python-style dicts
+                try:
+                    fixed_v = v.replace("'", '"')
+                    return json.loads(fixed_v)
+                except json.JSONDecodeError:
+                    # Final fallback: parse simple 'key: value' pairs
+                    try:
+                        parsed_dict = {}
+                        pairs = v.split(',')
+                        for pair in pairs:
+                            key_value = pair.split(':', 1)
+                            if len(key_value) == 2:
+                                key = key_value[0].strip()
+                                value = float(key_value[1].strip())
+                                parsed_dict[key] = value
+                        return parsed_dict
+                    except Exception as e:
+                        raise ValueError(f"Breakdown could not be parsed. Original error: {e}") from e
+        else:
+            raise ValueError("Breakdown must be a valid JSON dictionary string or a simple 'key: value' string.")
+
+# Prompt to guide the LLM to output structured JSON
 cost_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful assistant that estimates travel costs."),
-    ("user", "Estimate travel cost for {days} days at {destination}. "
+    ("user", "Estimate travel cost for {duration} days at {destination}. "
              "Return a JSON with total_cost (float), breakdown (dict of hotel, flight, other costs).")
 ])
 
-# Create LLM chain for structured output tied to CostEstimate model
+# Create structured output LLM chain tied to the CostEstimate schema
 chain = create_llm_chain(cost_prompt, structured=True, schema=CostEstimate)
 
 @tool
-def estimate_cost(destination: str, days: int = None) -> str:
+def estimate_cost(destination: str, duration: int = None) -> str:
     """
     Estimate the travel cost for a given destination and number of days.
 
     Args:
         destination (str): The travel destination (or a JSON string containing destination and days).
-        days (int): Number of days to stay.
+        duration (int): Number of days to stay.
 
     Returns:
         str: JSON string containing destination, days, total cost, and cost breakdown.
     """
     try:
+        # Check if the input is a JSON string containing both destination and duration
         data = json.loads(destination)
         destination = data.get('destination', destination)
-        days = data.get('days', days)
+        duration = data.get('duration', duration)
     except (json.JSONDecodeError, TypeError):
+        # If not a JSON string, proceed with the original inputs
         pass
 
-    if days is None:
-        return json.dumps({
-            "destination": destination,
-            "days": None,
-            "total_cost": 0.0,
-            "breakdown": {"error": "Missing 'days' parameter. Please provide the number of days for the trip."}
-        })
-    
     try:
-        days = int(days)
-        if days <= 0:
-            raise ValueError("Days must be a positive integer.")
-    except (ValueError, TypeError):
-        raise ValueError("Days must be a positive integer.")
-
-    try:
-        result: CostEstimate = chain.invoke({"destination": destination, "days": days})
+        # Invoke the LLM chain to get the structured response
+        result: CostEstimate = chain.invoke({"destination": destination, "duration": duration})
     except Exception as e:
+        # Handle cases where the LLM chain fails to produce a valid response
         print(f"LLM chain failed to produce a valid response: {e}")
         result = CostEstimate(
             destination=destination,
-            days=days,
+            duration=duration,
             total_cost=0.0,
             breakdown={"error": "LLM failed to generate valid cost data. Default values provided."}
         )
-    return result.model_dump_json()
+    return result.model_dump_json(indent=2)
