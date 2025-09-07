@@ -1,3 +1,4 @@
+# src/tools/activity.py
 from pydantic import BaseModel, Field
 from langchain.prompts import ChatPromptTemplate
 from src.tools.base import create_llm_chain
@@ -5,56 +6,40 @@ from langchain_core.tools import tool
 from typing import List
 import json
 
-
 class DailyPlan(BaseModel):
-    duration: int = Field(description="Day number of the trip")
-    activities: List[str] = Field(description="List of activities for this day")
-    estimated_cost: float = Field(description="Estimated cost for the day")
-
-
+    duration: int
+    activities: List[str]
+    estimated_cost: float
 
 class PlanActivities(BaseModel):
-    destination: str = Field(description="Selected destination")
-    duration: int = Field(description="Number of days")
-    interest: str = Field(description="User's interest, e.g., 'relaxation', 'adventure'")
-    budget: float = Field(description="Estimated total budget for the trip")
-    daily_plans: List[DailyPlan] = Field(description="Day-by-day activity breakdown")
-
+    destination: str
+    duration: int
+    interest: str
+    budget: float
+    daily_plans: List[DailyPlan]
 
 activities_prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a helpful travel assistant. Always return JSON matching the schema."),
-    ("user", "Suggest a {duration}-day itinerary for {destination}, focused on {interest}. "
-             "Provide a JSON object with a 'daily_plans' list, where each item contains "
-             "the day number and a list of activities.")
+    ("system", "You are a helpful travel assistant. Return JSON matching the schema."),
+    ("user", "Plan a {duration}-day itinerary for {destination} focused on {interest}.")
 ])
-
 
 chain = create_llm_chain(activities_prompt, structured=True, schema=PlanActivities)
 
-
 @tool
-def plan_activities(destination: str, interest: str = None, duration: int = None) -> str:
+def plan_activities(destination: str, interest: str = None, duration: int = 1, budget: float = None) -> str:
     """
-    Plans activities for a given destination and number of days based on user interest.
+    Plan day-by-day activities for a given destination based on user interest, duration, and budget.
 
     Args:
-        destination (str): The travel destination.
-        interest (str): The user's interest, e.g., 'relaxation', 'adventure'.
-        duration (int): The number of days for the trip.
+        destination (str): Selected travel destination.
+        interest (str, optional): User's interest, e.g., 'relaxation', 'adventure'.
+        duration (int, optional): Number of days for the trip. Default is 1.
+        budget (float, optional): Total budget for the trip.
 
     Returns:
-        str: JSON string containing the destination, interest, and day-by-day planned activities.
+        str: JSON string containing destination, interest, duration, budget, and daily activity plans.
     """
-    try:
-        data = json.loads(destination)
-        if 'destination' in data and 'interest' in data and 'duration' in data:
-            destination = data['destination']
-            interest = data['interest']
-            duration = data['duration']
-    except json.JSONDecodeError:
-        pass
-
     result: PlanActivities = chain.invoke(
-        {"destination": destination, "duration": duration, "interest": interest}
+        {"destination": destination, "duration": duration, "interest": interest, "budget": budget}
     )
     return result.model_dump_json(indent=2)

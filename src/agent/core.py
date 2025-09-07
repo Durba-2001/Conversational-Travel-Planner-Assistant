@@ -1,113 +1,105 @@
+import os
+from dotenv import load_dotenv, find_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+from src.agent.memory import get_session_memory  # sync memory
 from src.tools.destination import recommend_destinations
 from src.tools.cost import estimate_cost
 from src.tools.activity import plan_activities
 from src.tools.sub_agent import generate_itinerary
-from src.agent.memory import create_memory
 from src.agent.structure import TravelItinerary
-import os
-from dotenv import load_dotenv, find_dotenv
-import json
 
-# Load env vars
+# Load API key
 load_dotenv(find_dotenv())
-api_key = os.environ.get("GOOGLE_API_KEY")
+api_key = os.getenv("GOOGLE_API_KEY")
 
-# Initialize LLM and wrap with structured output schema binding
+# Initialize LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
-structured_llm = llm.with_structured_output(TravelItinerary)
 
 # Define tools
 tools = [
-    Tool(
-        name="Destination Recommender",
-        func=recommend_destinations,
-        description="Suggests travel destinations based on user preferences."
-    ),
-    Tool(
-        name="Cost Estimator",
-        func=estimate_cost,
-        description="Estimates the total travel cost based on destination and duration."
-    ),
-    Tool(
-        name="Activity Planner",
-        func=plan_activities,
-        description="Plans activities for the trip considering destination and interests."
-    ),
-    Tool(
-        name="Itinerary Generator",
-        func=generate_itinerary,  # This should invoke structured_llm internally
-        description="Generates a day-by-day travel itinerary."
-    ),
+    Tool("Destination Recommender", recommend_destinations, "Suggests destinations."),
+    Tool("Cost Estimator", estimate_cost, "Estimates total travel cost."),
+    Tool("Activity Planner", plan_activities, "Plans day-by-day activities."),
+    Tool("Generate Itinerary", generate_itinerary, "Generates full travel itinerary.")
 ]
 
+# Prompt template
 prompt = PromptTemplate(
     input_variables=["input", "agent_scratchpad", "tools", "tool_names"],
     template="""
-You are a thoughtful travel planning assistant.
+You are a travel assistant. You have access to the following tools:
 
-You have access to these tools:
 {tools}
+Tool names: {tool_names}
 
-Available tool names:
-{tool_names}
+Use the following format:
 
-When calling a tool, ALWAYS output exactly 2 lines:
-Action: <tool name>
-Action Input: <JSON-encoded string of input arguments>
+Thought: ...
+Action: ...
+Action Input: ...
+Observation: ...
+Thought: I now know the final answer
+Final Answer: detailed human-readable plan
 
-When ready to answer, output a single JSON matching this schema:
-{{
-  "destination": "string",
-  "duration": "integer",
-  "total_budget": "float",
-  "daily_plans": [
-    {{
-      "duration": "integer",
-      "activities": ["string"],
-      "estimated_cost": "float"
-    }}
-  ]
-}}
-
-If missing data, fill fields with null or defaults, do NOT output free text.
-
-User question: {input}
+User request: {input}
 
 {agent_scratchpad}
 """
 )
 
-# Create memory and agent
-conversation_memory = create_memory(llm=llm, max_messages=10, summary_token_budget=300)
-agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
-
-agent_executor = AgentExecutor(
-    agent=agent,
+# Build agent
+react_agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+agent_executor = AgentExecutor.from_agent_and_tools(
+    agent=react_agent,
     tools=tools,
-    memory=conversation_memory,
     verbose=True,
-    max_iterations=4,
-    early_stopping_method="force",
-    handle_parsing_errors=True,  # Enable auto-retry on output parsing errors
-    stop_sequence=['\nObservation:', '\nThought:']
+    max_iterations=20,
+    max_execution_time=120,
+    handle_parsing_errors=True
 )
 
-# Entrypoint
-def run_agent(preference: str, budget: float, duration: int, interest: str) -> TravelItinerary:
-    user_preferences = {
-        "preference": preference,
-        "budget": budget,
-        "duration": duration,
-        "interest": interest,
-    }
-    user_query = json.dumps(user_preferences)
-    
-    # Use the reactive agent executor to invoke and get structured output
-    response = agent_executor.invoke({"input": user_query})
-    
-    # The `output` will be a parsed TravelItinerary instance due to `structured_llm` binding
-    return response.get("output")
+# Wrap agent with memory
+def get_agent_with_memory(session_id: str):
+    memory = get_session_memory(session_id)  # sync memory
+    return RunnableWithMessageHistory(
+        agent_executor,
+        get_session_history=lambda _: memory.chat_memory
+    )
+
+# --- Synchronous run_agent ---
+def run_agent(message: str, session_id: str) -> str:
+    """
+    Run the travel agent synchronously and return a human-readable string.
+    """
+    memory = get_session_memory(session_id)
+    response = agent_executor.invoke(
+        {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
+        config={"configurable": {"session_id": session_id, "memory": memory}}
+    )
+
+    # Handle TravelItinerary objects
+    if isinstance(response, TravelItinerary):
+        text = f"Your {response.duration}-day travel plan to {response.destination} within budget ${response.total_budget}. "
+        text += "Daily activities: "
+        total_cost = 0
+        for day_plan in response.daily_plans:
+            day = day_plan.get("day", "?")
+            activities = ", ".join(day_plan.get("activities", []))
+            cost = day_plan.get("estimated_cost", 0)
+            total_cost += cost
+            text += f"Day {day}: {activities}. Cost: ${cost}. "
+        text += f"Total estimated activity cost: ${total_cost}."
+    elif isinstance(response, dict) and "output" in response:
+        text = str(response["output"])
+    else:
+        text = str(response)
+
+    # Flatten text
+    text = text.replace("\n", " ").replace("*", "")
+    text = " ".join(text.split())
+    return text

@@ -1,17 +1,42 @@
-from langchain.memory import ConversationSummaryMemory
-from langchain_google_genai import ChatGoogleGenerativeAI
-
-# Initialize your LLM for summarization (should match your main LLM or could be a smaller/cheaper one for efficiency)
 import os
 from dotenv import load_dotenv, find_dotenv
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.memory import ConversationSummaryBufferMemory
+from langchain_mongodb.chat_message_histories import MongoDBChatMessageHistory
+
+# Load environment variables
 load_dotenv(find_dotenv())
-api_key = os.environ.get("GOOGLE_API_KEY")
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash",api_key=api_key)
-# Create a conversation memory with summarization
-def create_memory(llm,max_messages: int = 10, summary_token_budget: int = 300):
-    return ConversationSummaryMemory(
+API_KEY = os.environ.get("GOOGLE_API_KEY")
+
+# LLM for summarization (can be same or cheaper model)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=API_KEY)
+
+# Synchronous session memories cache
+session_memories = {}
+
+def get_session_memory(session_id: str, summary_token_budget: int = 300):
+    """
+    Returns a session-specific ConversationSummaryBufferMemory,
+    backed by MongoDB for persistence.
+    """
+    if session_id in session_memories:
+        return session_memories[session_id]
+
+    # MongoDBChatMessageHistory can be used synchronously here
+    chat_history = MongoDBChatMessageHistory(
+        session_id=session_id,
+        connection_string=os.environ.get("MONGODB_URI"),
+        database_name="travel_planner",  # your DB name
+        collection_name="sessions",
+    )
+
+    memory = ConversationSummaryBufferMemory(
         llm=llm,
+        chat_memory=chat_history,
         memory_key="chat_history",
         return_messages=True,
-        max_token_limit=summary_token_budget
+        max_token_limit=summary_token_budget,
     )
+
+    session_memories[session_id] = memory
+    return memory

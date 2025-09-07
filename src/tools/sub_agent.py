@@ -1,48 +1,64 @@
+# src/tools/sub_agent.py
+
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.schema import HumanMessage
 from langchain.tools import tool
 from src.agent.structure import TravelItinerary
-from src.tools.destination import recommend_destinations
-from src.tools.cost import estimate_cost
-from src.tools.activity import plan_activities
 import json
-
+import os
+from dotenv import load_dotenv
 @tool
-def generate_itinerary(input_data) -> TravelItinerary:
-    """Generate a detailed travel itinerary based on preferences, budget, days, and interest."""
+def generate_itinerary(user_request: str) -> TravelItinerary:
+    """
+    LLM-driven ReAct sub-agent for generating a structured TravelItinerary.
+    Accepts a user request text, calls internal tools via LLM reasoning, 
+    and returns structured TravelItinerary.
+    """
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key, temperature=0)
 
-    # Safely handle both dict and JSON string inputs
-    if isinstance(input_data, str):
-        try:
-            input_data = json.loads(input_data)
-        except Exception as e:
-            raise ValueError(f"Input must be a dict or valid JSON string: {e}")
+    prompt = f"""
+You are an itinerary generator agent.
+Given the user request: "{user_request}", do the following:
 
-    preference = input_data.get("preference")
-    budget = input_data.get("budget")
-    duration = input_data.get("duration")
-    interest = input_data.get("interest")
+1. Extract preferences, budget, duration, and interest.
+2. Call the internal tools in order using their exact tool names:
+   - Destination Recommender (preference, budget)
+   - Cost Estimator (destination, duration)
+   - Activity Planner (destination, interest, duration, budget)
+3. Combine all results into a structured JSON:
 
-    # Explicit validation (don't use all([...]) for numeric fields)
-    if preference is None or budget is None or duration is None or interest is None:
-        raise ValueError(f"Missing one or more required fields: {input_data}")
+{{
+  "destination": "<destination>",
+  "duration_days": <duration>,
+  "total_budget": <total_budget>,
+  "daily_plans": [
+      {{"day": 1, "activities": ["..."], "estimated_cost": ...}},
+      {{"day": 2, "activities": ["..."], "estimated_cost": ...}}
+  ]
+}}
 
-    # Call helper tools directly
-    dest_result = recommend_destinations({"preference": preference,"budget":budget})
-    destination = dest_result.destinations[0] if dest_result.destinations else "Unknown"
+Respond ONLY in valid JSON. Use the exact tool names above when referencing tools.
+"""
 
-    cost_result = estimate_cost({"destination": destination, "duration": duration})
-    total_budget = cost_result.budget
 
-    activities_result = plan_activities({
-        "destination": destination,
-        "interest": interest,
-        "duration": duration
-    })
-    daily_plans = activities_result.daily_plans
+    response = llm([HumanMessage(content=prompt)]).content
 
-    # Build the itinerary model
+    # Safe JSON parsing
+    try:
+        itinerary_dict = json.loads(response)
+    except json.JSONDecodeError:
+        itinerary_dict = {
+            "destination": "Unknown",
+            "duration_days": 1,
+            "total_budget": 0.0,
+            "daily_plans": []
+        }
+
     return TravelItinerary(
-        destination=destination,
-        duration=duration,
-        total_budget=total_budget,
-        daily_plans=daily_plans,
+        destination=itinerary_dict.get("destination"),
+        duration=itinerary_dict.get("duration_days"),
+        total_budget=itinerary_dict.get("total_budget"),
+        daily_plans=itinerary_dict.get("daily_plans", []),
     )
