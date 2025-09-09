@@ -1,12 +1,6 @@
-from pydantic import BaseModel, Field
 from langchain_core.tools import tool
 import json
 from src.agent.structure import CostEstimate
-# class CostEstimate(BaseModel):
-#     destination: str = Field(description="Selected destination")
-#     days: int = Field(description="Number of days")
-#     total_cost: float = Field(description="Estimated cost in USD")
-#     breakdown: dict = Field(description="Cost components")
 
 @tool
 def estimate_cost(inputs: dict | str) -> str:

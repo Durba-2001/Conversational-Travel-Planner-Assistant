@@ -22,7 +22,7 @@ class PlanActivities(BaseModel):
     duration: int
     interest: str
     budget: float
-    daily_plans: List[DailyPlan]
+  
 
 class CostEstimate(BaseModel):
     destination: str = Field(description="Selected destination")

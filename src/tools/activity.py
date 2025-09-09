@@ -17,7 +17,7 @@ activities_prompt = ChatPromptTemplate.from_messages([
 chain = create_llm_chain(activities_prompt, structured=True, schema=PlanActivities)
 
 @tool
-def plan_activities(destination: str, interest: str = None, duration: int = 1, budget: float = None) -> str:
+def plan_activities(destination: str, interest: str = None, duration: int = 0, budget: float = None) -> str:
     """
     Plan day-by-day activities for a given destination based on user interest, duration, and budget.
 

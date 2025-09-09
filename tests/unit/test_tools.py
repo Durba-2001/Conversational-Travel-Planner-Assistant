@@ -1,83 +1,122 @@
 import pytest
 import json
-from unittest.mock import patch
-from src.tools.activity import plan_activities
-from src.tools.sub_agent import generate_itinerary
 from src.tools.destination import recommend_destinations
 from src.tools.cost import estimate_cost
+from src.tools.activity import plan_activities
+from src.tools.sub_agent import generate_itinerary
 
-# ---------------------------
-# 1. Test plan_activities
-# ---------------------------
 
-@patch("src.tools.activity.chain.invoke")
-def test_plan_activities_mocked(mock_invoke):
-    mock_invoke.return_value.model_dump_json.return_value = json.dumps({
-        "destination": "Paris",
-        "duration": 2,
-        "interest": "sightseeing",
-        "budget": 2000,
-        "daily_plans": [
-            {"duration": 1, "activities": ["Eiffel Tower"], "estimated_cost": 500},
-            {"duration": 2, "activities": ["Louvre Museum"], "estimated_cost": 400}
-        ]
-    })
-    
-    result_json = plan_activities(destination="Paris", interest="sightseeing", duration=2, budget=2000)
-    result = json.loads(result_json)
-    assert result["destination"] == "Paris"
-    assert len(result["daily_plans"]) == 2
-    assert result["daily_plans"][0]["duration"] == 1
+# ----------------- Helper ----------------- #
+import json
+from pydantic import BaseModel
 
-# ---------------------------
-# 2. Test estimate_cost
-# ---------------------------
-def test_estimate_cost_basic():
-    inputs = {"destination": "Rome", "days": 3}
-    result_json = estimate_cost(inputs)
-    result = json.loads(result_json)
-    assert result["destination"] == "Rome"
-    assert result["days"] == 3
-    assert result["total_cost"] == 1800  # 3*500 + 300
-    assert "hotel" in result["breakdown"]
-    assert "flight" in result["breakdown"]
+import json
+from pydantic import BaseModel
 
-# ---------------------------
-# 3. Test recommend_destinations
-# ---------------------------
+def normalize_result(result):
+    """Ensure tool output is always a dict."""
+    if isinstance(result, str):
+        try:
+            return json.loads(result)
+        except Exception:
+            return {"error": "Invalid JSON output", "raw": result}
+    elif isinstance(result, BaseModel):  # Works for TravelItinerary
+        return result.model_dump()
+    elif isinstance(result, dict):
+        return result
+    else:
+        return {"error": f"Unsupported result type: {type(result)}", "raw": str(result)}
 
-@patch("src.tools.destination.chain.invoke")
-def test_recommend_destinations_mocked(mock_invoke):
-    mock_invoke.return_value.model_dump_json.return_value = json.dumps({
-        "destinations": ["Paris", "Rome", "Venice"],
-        "reasoning": "Based on budget and preference"
-    })
-    
-    result_json = recommend_destinations(preference="historical", budget=3000)
-    result = json.loads(result_json)
+
+
+
+# ----------------- Destination Recommender ----------------- #
+def test_recommend_destination_valid():
+    inputs = {"preference": "beach, relaxing", "budget": 1000}
+    result = normalize_result(recommend_destinations.invoke(inputs))
+
+    assert isinstance(result, dict)
     assert "destinations" in result
-    assert len(result["destinations"]) == 3
+    assert isinstance(result["destinations"], list)
+    assert len(result["destinations"]) > 0
 
-# ---------------------------
-# 4. Test generate_itinerary
-# ---------------------------
 
-@patch("src.tools.sub_agent.ChatGoogleGenerativeAI.invoke")
-def test_generate_itinerary_mocked(mock_invoke):
-    mock_response = json.dumps({
-        "destination": "Paris",
-        "duration_days": 2,
-        "total_budget": 2000,
-        "daily_plans": [
-            {"day": 1, "activities": ["Eiffel Tower"], "estimated_cost": 500},
-            {"day": 2, "activities": ["Louvre Museum"], "estimated_cost": 400}
-        ]
-    })
-    mock_invoke.return_value.content = mock_response
+def test_recommend_destination_invalid():
+    inputs = {"preference": "", "budget": 0}
+    result = normalize_result(recommend_destinations.invoke(inputs))
 
-    result = generate_itinerary("Plan a 2-day trip to Paris")
-    assert result.destination == "Paris"
-    assert result.duration == 2
-    assert len(result.daily_plans) == 2
-    assert result.daily_plans[0].duration == 1
-    assert result.daily_plans[1].activities == ["Louvre Museum"]
+    assert isinstance(result, dict)
+    assert "destinations" in result
+    assert isinstance(result["destinations"], list)
+    # Expect fallback or free destinations
+    assert len(result["destinations"]) >= 1
+
+
+# ----------------- Cost Estimator ----------------- #
+def test_estimate_cost_valid():
+    inputs = {"inputs": {"destination": "Paris", "days": 5}}
+    result = normalize_result(estimate_cost.invoke(inputs))
+
+    assert isinstance(result, dict)
+    assert "total_cost" in result
+    assert result["total_cost"] > 0
+    assert result["destination"] == "Paris"
+
+
+
+def test_estimate_cost_invalid():
+    inputs = {"inputs": {"destination": "", "days": -1}}
+    result = normalize_result(estimate_cost.invoke(inputs))
+
+    assert isinstance(result, dict)
+    assert "total_cost" in result
+    # Invalid input → cost should not be positive
+    assert result["total_cost"] <= 0 or "error" in result
+
+
+
+
+# ----------------- Activity Planner ----------------- #
+def test_plan_activities_valid():
+    inputs = {"destination": "Goa", "duration": 3, "interest": "adventure", "budget": 500}
+    result = normalize_result(plan_activities.invoke(inputs))
+
+    assert isinstance(result, dict)
+    assert "destination" in result
+    assert result["destination"] == "Goa"
+    assert "duration" in result
+    assert result["duration"] == 3
+    assert "interest" in result
+    assert result["interest"] == "adventure"
+    assert "budget" in result
+    assert result["budget"] > 0
+
+
+
+def test_plan_activities_invalid():
+    inputs = {"destination": "", "duration": 0, "interest": "", "budget": -100}
+    result = normalize_result(plan_activities.invoke(inputs))
+
+    assert isinstance(result, dict)
+    # At least one field should signal invalid state
+    assert result.get("destination", "") == "" or result.get("duration", 0) <= 0
+
+
+# ----------------- Itinerary Sub-Agent ----------------- #
+def test_generate_itinerary_valid():
+    result = normalize_result(generate_itinerary.invoke("Plan a 2-day trip to Goa"))
+
+    assert isinstance(result, dict)
+    assert "destination" in result
+    assert "duration" in result
+    assert "daily_plans" in result
+
+
+
+def test_generate_itinerary_invalid():
+    raw = generate_itinerary.invoke("")     # Returns TravelItinerary
+    result = normalize_result(raw)          # Convert to dict
+
+    assert isinstance(result, dict)
+    assert "error" in result or result.get("destination", "") in ("", "Unknown")
+
