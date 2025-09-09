@@ -6,21 +6,12 @@ from langchain_core.tools import tool
 from typing import List
 from src.agent.structure import PlanActivities
 
-# class DailyPlan(BaseModel):
-#     duration: int
-#     activities: List[str]
-#     estimated_cost: float
 
-# class PlanActivities(BaseModel):
-#     destination: str
-#     duration: int
-#     interest: str
-#     budget: float
-#     daily_plans: List[DailyPlan]
 
 activities_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful travel assistant. Return JSON matching the schema."),
-    ("user", "Plan a {duration}-day itinerary for {destination} focused on {interest}.")
+    ("user", "Plan a {duration}-day itinerary for {destination} focused on {interest}."
+              "Make sure to create exactly {duration} daily_plans with day numbers starting from 1.")
 ])
 
 chain = create_llm_chain(activities_prompt, structured=True, schema=PlanActivities)
