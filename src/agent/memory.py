@@ -9,7 +9,7 @@ load_dotenv(find_dotenv())
 API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 # LLM for summarization (can be same or cheaper model)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=API_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=API_KEY)
 
 # Synchronous session memories cache
 session_memories = {}

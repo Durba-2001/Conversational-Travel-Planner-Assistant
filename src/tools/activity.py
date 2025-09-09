@@ -33,7 +33,7 @@ def plan_activities(destination: str, interest: str = None, duration: int = 1, b
     Args:
         destination (str): Selected travel destination.
         interest (str, optional): User's interest, e.g., 'relaxation', 'adventure'.
-        duration (int, optional): Number of days for the trip. Default is 1.
+        duration (int, optional): Number of days for the trip.
         budget (float, optional): Total budget for the trip.
 
     Returns:

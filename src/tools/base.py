@@ -11,7 +11,7 @@ load_dotenv(find_dotenv())
 api_key = os.environ.get("GOOGLE_API_KEY")
 
 # Default shared LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
 
 # Optional default structured response
 class LLMStructuredResponse(BaseModel):

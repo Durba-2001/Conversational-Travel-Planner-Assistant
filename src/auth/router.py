@@ -6,17 +6,10 @@ from jose import jwt, JWTError
 from hashlib import sha256
 from src.database.session import get_db
 from src.auth.models import UserCreate, UserResponse, UserSchema
+from src.config import SECRET_KEY,ALGORITHM,ACCESS_TOKEN_EXPIRE_MINUTES
 
-import os
-from dotenv import load_dotenv, find_dotenv
 
 router = APIRouter()
-
-# Load env variables
-load_dotenv(find_dotenv())
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "secret")
-ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 60))
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 

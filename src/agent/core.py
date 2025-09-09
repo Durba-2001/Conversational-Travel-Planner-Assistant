@@ -18,14 +18,14 @@ load_dotenv(find_dotenv())
 api_key = os.getenv("GOOGLE_API_KEY")
 
 # Initialize LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
 
 # Define tools
 tools = [
-    Tool("Destination Recommender", recommend_destinations, "Suggests destinations."),
-    Tool("Cost Estimator", estimate_cost, "Estimates total travel cost."),
-    Tool("Activity Planner", plan_activities, "Plans day-by-day activities."),
-    Tool("Generate Itinerary", generate_itinerary, "Generates full travel itinerary.")
+    Tool("recommend_destinations", recommend_destinations, "Suggests destinations."),
+    Tool("estimate_costr", estimate_cost, "Estimates total travel cost."),
+    Tool("plan_activities", plan_activities, "Plans day-by-day activities."),
+    Tool("generate_itinerary", generate_itinerary, "Generates full travel itinerary.")
 ]
 
 # Prompt template

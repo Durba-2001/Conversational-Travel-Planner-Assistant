@@ -9,11 +9,11 @@ class CostEstimate(BaseModel):
     breakdown: dict = Field(description="Cost components")
 
 @tool
-def estimate_cost(inputs: "dict | str") -> str:
+def estimate_cost(inputs: dict | str) -> str:
     """
-    Estimates total travel cost based on a simple formula:
-    total_cost = (days * 10000) + 20000 (hotel + base flight cost).
-
+   Estimates total travel cost in USD.
+    Formula: total_cost = (days * 500) + 300
+    (hotel: $500 per day + base flight: $300).
     Args:
         inputs (dict | str): Dictionary with keys:
             - 'destination' (str): The travel destination

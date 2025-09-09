@@ -24,9 +24,9 @@ Given the user request: "{user_request}", do the following:
 
 1. Extract preferences, budget, duration, and interest.
 2. Call the internal tools in order using their exact tool names:
-   - Destination Recommender (preference, budget)
-   - Cost Estimator (destination, duration)
-   - Activity Planner (destination, interest, duration, budget)
+   - recommend_destinations (preference, budget)
+   - estimate_cost (destination, duration)
+   - plan_activities (destination, interest, duration, budget)
 3. Combine all results into a structured JSON:
 
 {{
@@ -43,7 +43,7 @@ Respond ONLY in valid JSON. Use the exact tool names above when referencing tool
 """
 
 
-    response = llm([HumanMessage(content=prompt)]).content
+    response = llm.invoke([HumanMessage(content=prompt)]).content
 
     # Safe JSON parsing
     try:
