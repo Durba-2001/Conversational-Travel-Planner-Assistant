@@ -4,19 +4,19 @@ from langchain.prompts import ChatPromptTemplate
 from src.tools.base import create_llm_chain
 from langchain_core.tools import tool
 from typing import List
-import json
+from src.agent.structure import PlanActivities
 
-class DailyPlan(BaseModel):
-    duration: int
-    activities: List[str]
-    estimated_cost: float
+# class DailyPlan(BaseModel):
+#     duration: int
+#     activities: List[str]
+#     estimated_cost: float
 
-class PlanActivities(BaseModel):
-    destination: str
-    duration: int
-    interest: str
-    budget: float
-    daily_plans: List[DailyPlan]
+# class PlanActivities(BaseModel):
+#     destination: str
+#     duration: int
+#     interest: str
+#     budget: float
+#     daily_plans: List[DailyPlan]
 
 activities_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful travel assistant. Return JSON matching the schema."),

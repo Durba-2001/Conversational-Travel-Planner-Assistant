@@ -4,16 +4,16 @@ from src.agent.core import run_agent
 from src.database.session import get_db
 from src.auth.router import get_current_user
 import uuid
-
+from src.database.models import ChatRequest,ChatResponse
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 # Request / Response models
-class ChatRequest(BaseModel):
-    message: str
+# class ChatRequest(BaseModel):
+#     message: str
 
-class ChatResponse(BaseModel):
-    session_id: str
-    response: str  # Human-readable text
+# class ChatResponse(BaseModel):
+#     session_id: str
+#     response: str  # Human-readable text
 
 # Create a new session
 @router.post("/", response_model=ChatResponse, status_code=201)

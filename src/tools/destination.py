@@ -5,10 +5,10 @@ from src.tools.base import create_llm_chain
 from langchain_core.tools import tool
 from typing import List
 import json
-
-class DestinationSuggestion(BaseModel):
-    destinations: List[str] = Field(description="List of recommended destinations")
-    reasoning: str = Field(description="Explanation for suggestions")
+from src.agent.structure import DestinationSuggestion
+# class DestinationSuggestion(BaseModel):
+#     destinations: List[str] = Field(description="List of recommended destinations")
+#     reasoning: str = Field(description="Explanation for suggestions")
 
 destination_prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful travel assistant. Suggest destinations based on preferences and budget. Return JSON."),

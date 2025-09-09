@@ -1,14 +1,11 @@
 from pymongo import AsyncMongoClient   # Import AsyncMongoClient to connect to MongoDB asynchronously
-import os                              # Import os to read environment variables
-from dotenv import load_dotenv,find_dotenv # Import functions to load variables from a .env file
 from loguru import logger
+from src.config import MongoDB_url
 client=None
 # Define an async function to get a MongoDB database
 async def get_db(db_name="travel_planner_db"):
   global client
-  load_dotenv(find_dotenv())                # Load environment variables from .env file
-  MongoDB_url=os.environ.get("MONGODB_URI") # Get the MongoDB connection URL from environment variables
-  
+
   try:
       if not client:
         logger.info("Connecting to MongoDB...")   # Log info before connecting

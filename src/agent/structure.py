@@ -12,3 +12,21 @@ class TravelItinerary(BaseModel):
     duration: int = Field(description="Total days")
     total_budget: float = Field(description="Estimated total budget in USD")
     daily_plans: List[DailyPlan] = Field(description="Breakdown by day")
+
+class DestinationSuggestion(BaseModel):
+    destinations: List[str] = Field(description="List of recommended destinations")
+    reasoning: str = Field(description="Explanation for suggestions")
+    
+class PlanActivities(BaseModel):
+    destination: str
+    duration: int
+    interest: str
+    budget: float
+    daily_plans: List[DailyPlan]
+
+class CostEstimate(BaseModel):
+    destination: str = Field(description="Selected destination")
+    days: int = Field(description="Number of days")
+    total_cost: float = Field(description="Estimated cost in USD")
+    breakdown: dict = Field(description="Cost components")
+

@@ -5,8 +5,8 @@ from langchain.schema import HumanMessage
 from langchain.tools import tool
 from src.agent.structure import TravelItinerary
 import json
-import os
-from dotenv import load_dotenv
+from src.config import api_key
+
 @tool
 def generate_itinerary(user_request: str) -> TravelItinerary:
     """
@@ -14,8 +14,7 @@ def generate_itinerary(user_request: str) -> TravelItinerary:
     Accepts a user request text, calls internal tools via LLM reasoning, 
     and returns structured TravelItinerary.
     """
-    load_dotenv()
-    api_key = os.getenv("GOOGLE_API_KEY")
+    
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key, temperature=0)
 
     prompt = f"""

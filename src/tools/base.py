@@ -1,14 +1,9 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-import os
-from dotenv import load_dotenv, find_dotenv
 from langchain.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 import json
 from langchain.chains.base import Chain
-
-# Load env
-load_dotenv(find_dotenv())
-api_key = os.environ.get("GOOGLE_API_KEY")
+from src.config import api_key
 
 # Default shared LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)

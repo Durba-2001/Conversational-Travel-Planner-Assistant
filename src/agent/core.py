@@ -1,5 +1,4 @@
-import os
-from dotenv import load_dotenv, find_dotenv
+from src.config import api_key
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
@@ -13,9 +12,6 @@ from src.tools.activity import plan_activities
 from src.tools.sub_agent import generate_itinerary
 from src.agent.structure import TravelItinerary
 
-# Load API key
-load_dotenv(find_dotenv())
-api_key = os.getenv("GOOGLE_API_KEY")
 
 # Initialize LLM
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
