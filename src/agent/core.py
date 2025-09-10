@@ -19,10 +19,15 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
 # Define tools
 tools = [
     Tool("recommend_destinations", recommend_destinations, "Suggests destinations."),
-    Tool("estimate_costr", estimate_cost, "Estimates total travel cost."),
+    Tool("estimate_cost", estimate_cost, "Estimates total travel cost."),
     Tool("plan_activities", plan_activities, "Plans day-by-day activities."),
-    Tool("generate_itinerary", generate_itinerary, "Generates full travel itinerary.")
+    Tool(
+        "generate_itinerary",
+        generate_itinerary,
+        "MANDATORY FINAL STEP: Combines destinations, costs, and activities into one structured TravelItinerary before giving the final answer."
+    )
 ]
+
 
 # Prompt template
 prompt = PromptTemplate(
@@ -54,7 +59,7 @@ agent_executor = AgentExecutor.from_agent_and_tools(
     agent=react_agent,
     tools=tools,
     verbose=True,
-    max_iterations=20,
+    #max_iterations=20,
     max_execution_time=120,
     handle_parsing_errors=True
 )

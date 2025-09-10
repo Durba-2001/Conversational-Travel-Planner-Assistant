@@ -1,63 +1,62 @@
 # src/tools/sub_agent.py
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage
-from langchain.tools import tool
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 from src.agent.structure import TravelItinerary
-import json
 from src.config import api_key
+
 
 @tool
 def generate_itinerary(user_request: str) -> TravelItinerary:
     """
-    LLM-driven ReAct sub-agent for generating a structured TravelItinerary.
-    Accepts a user request text, calls internal tools via LLM reasoning, 
-    and returns structured TravelItinerary.
+    LLM-driven tool for generating a structured TravelItinerary.
+    Accepts a user request text and returns a TravelItinerary object.
+    No external tools are actually invoked — the LLM directly generates output.
     """
-    
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key, temperature=0)
 
-    prompt = f"""
-You are an itinerary generator agent.
-Given the user request: "{user_request}", do the following:
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        api_key=api_key,
+        temperature=0
+    )
 
-1. Extract preferences, budget, duration, and interest.
-2. Call the internal tools in order using their exact tool names:
-   - recommend_destinations (preference, budget)
-   - estimate_cost (destination, duration)
-   - plan_activities (destination, interest, duration, budget)
-3. Combine all results into a structured JSON:
+    # Prompt template with strict instructions
+    prompt = ChatPromptTemplate.from_messages([
+    (
+        "system",
+        """You are a helpful travel itinerary planner.
+Always output **valid JSON only** that matches the TravelItinerary schema:
 
 {{
-  "destination": "<destination>",
-  "duration_days": <duration>,
-  "total_budget": <total_budget>,
+  "destination": "string",
+  "duration": int,
+  "total_budget": float,
   "daily_plans": [
-      {{"day": 1, "activities": ["..."], "estimated_cost": ...}},
-      {{"day": 2, "activities": ["..."], "estimated_cost": ...}}
+    {{
+      "duration": int,
+      "activities": ["string", "string"],
+      "estimated_cost": float
+    }}
   ]
 }}
 
-Respond ONLY in valid JSON. Use the exact tool names above when referencing tools.
+Rules:
+- Never output 'Unknown'.
+- Always select a realistic destination based on the request.
+- Ensure 'duration' matches the request.
+- 'total_budget' must be a reasonable estimate (e.g. duration * 500 + 300).
+- Daily activities should align with the interest mentioned in the request.
 """
+    ),
+    ("user", "{user_request}")
+])
 
 
-    response = llm.invoke([HumanMessage(content=prompt)]).content
+    # Create structured chain
+    chain = prompt | llm.with_structured_output(schema=TravelItinerary)
 
-    # Safe JSON parsing
-    try:
-        itinerary_dict = json.loads(response)
-    except json.JSONDecodeError:
-        itinerary_dict = {
-            "destination": "Unknown",
-            "duration_days": 1,
-            "total_budget": 0.0,
-            "daily_plans": []
-        }
+    # Run the chain
+    itinerary: TravelItinerary = chain.invoke({"user_request": user_request})
 
-    return TravelItinerary(
-        destination=itinerary_dict.get("destination"),
-        duration=itinerary_dict.get("duration_days"),
-        total_budget=itinerary_dict.get("total_budget"),
-        daily_plans=itinerary_dict.get("daily_plans", []),
-    )
+    return itinerary

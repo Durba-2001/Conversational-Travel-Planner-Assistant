@@ -17,11 +17,11 @@ class DestinationSuggestion(BaseModel):
     destinations: List[str] = Field(description="List of recommended destinations")
     reasoning: str = Field(description="Explanation for suggestions")
     
-class PlanActivities(BaseModel):
-    destination: str
-    duration: int
-    interest: str
-    budget: float
+class ActivityList(BaseModel):
+    destination: str = Field(description="Selected destination")
+    interest: str = Field(description="User's interest")
+    activities: List[str] = Field(description="Recommended activities")
+
   
 
 class CostEstimate(BaseModel):

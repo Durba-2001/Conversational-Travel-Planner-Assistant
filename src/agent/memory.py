@@ -20,7 +20,7 @@ def get_session_memory(session_id: str, summary_token_budget: int = 300):
     chat_history = MongoDBChatMessageHistory(
         session_id=session_id,
         connection_string=MongoDB_url,
-        database_name="travel_planner",  # your DB name
+        database_name="travel_planner_db",  
         collection_name="sessions",
     )
 
