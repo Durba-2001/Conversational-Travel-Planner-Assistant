@@ -28,9 +28,3 @@ def create_llm_chain(
         structured_llm = llm.with_structured_output(schema)
         return prompt_template | structured_llm
     return prompt_template | llm
-
-def safe_parse_json(text: str):
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return None
