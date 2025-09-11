@@ -19,7 +19,8 @@ The assistant will:
 - **Testing**: Pytest for unit and integration tests.
 
 ### File Structure
-#### travel_planner/
+<pre>
+travel_planner/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                # FastAPI app entry point
