@@ -3,9 +3,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
-from langchain_core.runnables.history import RunnableWithMessageHistory
 
-from src.agent.memory import get_session_memory  # sync memory
+from src.agent.memory import get_agent_with_memory
 from src.tools.destination import recommend_destinations
 from src.tools.cost import estimate_cost
 from src.tools.activity import plan_activities
@@ -13,10 +12,10 @@ from src.tools.sub_agent import generate_itinerary
 from src.agent.structure import TravelItinerary
 
 
-# Initialize LLM
+# --- LLM ---
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
 
-# Define tools
+# --- Tools ---
 tools = [
     Tool("recommend_destinations", recommend_destinations, "Suggests destinations."),
     Tool("estimate_cost", estimate_cost, "Estimates total travel cost."),
@@ -28,8 +27,7 @@ tools = [
     )
 ]
 
-
-# Prompt template
+# --- Prompt ---
 prompt = PromptTemplate(
     input_variables=["input", "agent_scratchpad", "tools", "tool_names"],
     template="""
@@ -53,37 +51,27 @@ User request: {input}
 """
 )
 
-# Build agent
+# --- Agent ---
 react_agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
 agent_executor = AgentExecutor.from_agent_and_tools(
     agent=react_agent,
     tools=tools,
     verbose=True,
-    #max_iterations=20,
     max_execution_time=120,
     handle_parsing_errors=True
 )
 
-# Wrap agent with memory
-def get_agent_with_memory(session_id: str):
-    memory = get_session_memory(session_id)  # sync memory
-    return RunnableWithMessageHistory(
-        agent_executor,
-        get_session_history=lambda _: memory.chat_memory
-    )
 
-# --- Synchronous run_agent ---
+# --- Run agent ---
 def run_agent(message: str, session_id: str) -> str:
-    """
-    Run the travel agent synchronously and return a human-readable string.
-    """
-    memory = get_session_memory(session_id)
-    response = agent_executor.invoke(
+    agent_with_memory = get_agent_with_memory(agent_executor, session_id)
+
+    response = agent_with_memory.invoke(
         {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
-        config={"configurable": {"session_id": session_id, "memory": memory}}
+        config={"configurable": {"session_id": session_id}}
     )
 
-    # Handle TravelItinerary objects
+    # --- Handle TravelItinerary output ---
     if isinstance(response, TravelItinerary):
         text = f"Your {response.duration}-day travel plan to {response.destination} within budget ${response.total_budget}. "
         text += "Daily activities: "
@@ -100,7 +88,4 @@ def run_agent(message: str, session_id: str) -> str:
     else:
         text = str(response)
 
-    # Flatten text
-    text = text.replace("\n", " ").replace("*", "")
-    text = " ".join(text.split())
-    return text
+    return " ".join(text.replace("\n", " ").replace("*", "").split())
