@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from src.agent.structure import TravelItinerary
 from src.config import api_key
+from src.tools.base import create_llm_chain
 
 
 @tool
@@ -26,23 +27,9 @@ def generate_itinerary(user_request: str) -> TravelItinerary:
     (
         "system",
         """You are a helpful travel itinerary planner.
-Always output **valid JSON only** that matches the TravelItinerary schema:
-
-{{
-  "destination": "string",
-  "duration": int,
-  "total_budget": float,
-  "daily_plans": [
-    {{
-      "duration": int,
-      "activities": ["string", "string"],
-      "estimated_cost": float
-    }}
-  ]
-}}
-
+Always output **valid JSON only** that matches the TravelItinerary schema.
 Rules:
-- Never output 'Unknown'.
+
 - Always select a realistic destination based on the request.
 - Ensure 'duration' matches the request.
 - 'total_budget' must be a reasonable estimate (e.g. duration * 500 + 300).
@@ -54,9 +41,9 @@ Rules:
 
 
     # Create structured chain
-    chain = prompt | llm.with_structured_output(schema=TravelItinerary)
+    chain = create_llm_chain(prompt, structured=True, schema=TravelItinerary)
 
     # Run the chain
     itinerary: TravelItinerary = chain.invoke({"user_request": user_request})
 
-    return itinerary
+    return itinerary.model_dump_json(indent=2)
