@@ -15,13 +15,6 @@ def generate_itinerary(user_request: str) -> TravelItinerary:
     Accepts a user request text and returns a TravelItinerary object.
     No external tools are actually invoked — the LLM directly generates output.
     """
-
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        api_key=api_key,
-        temperature=0
-    )
-
     # Prompt template with strict instructions
     prompt = ChatPromptTemplate.from_messages([
     (
