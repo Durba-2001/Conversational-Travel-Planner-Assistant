@@ -12,7 +12,7 @@ def estimate_cost(inputs: dict | str) -> str:
     Args:
         inputs (dict | str): Dictionary with keys:
             - 'destination' (str): The travel destination
-            - 'days' (int): Number of days for the trip
+            - 'days' (int): Number of days for the trip(take number of days as 1 if nothing is mentioned.)
 
     Returns:
         str: JSON string matching CostEstimate schema,
@@ -22,7 +22,7 @@ def estimate_cost(inputs: dict | str) -> str:
     if isinstance(inputs, str):
         inputs = json.loads(inputs)
 
-    # ✅ Handle nested {"inputs": {...}}
+    # Handle nested {"inputs": {...}}
     if "inputs" in inputs:
         inputs = inputs["inputs"]
 

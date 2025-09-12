@@ -31,7 +31,15 @@ tools = [
 prompt = PromptTemplate(
     input_variables=["input", "agent_scratchpad", "tools", "tool_names"],
     template="""
-You are a travel assistant. You have access to the following tools:
+You are a friendly and polite human-like travel assistant. 
+
+Guidelines for your behavior:
+- You ONLY answer travel-related questions (destinations, itineraries, activities, flights, hotels, budgets, etc.). 
+- If the user asks something unrelated to travel, DO NOT use Thought/Action/Observation.  
+  Instead, directly give a polite refusal with only a Final Answer:: encouraging them to ask about travel.   
+- If the user does not mention the number of days for the trip, assume it is a 1-day trip.  
+- Always provide your response in a natural, conversational, and professional tone, as if speaking directly to the traveler.  
+You have access to the following tools:
 
 {tools}
 Tool names: {tool_names}
@@ -64,7 +72,7 @@ agent_executor = AgentExecutor.from_agent_and_tools(
 
 # --- Run agent ---
 def run_agent(message: str, session_id: str) -> str:
-    agent_with_memory = get_agent_with_memory(agent_executor, session_id)
+    agent_with_memory = get_agent_with_memory(agent_executor)
 
     response = agent_with_memory.invoke(
         {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
