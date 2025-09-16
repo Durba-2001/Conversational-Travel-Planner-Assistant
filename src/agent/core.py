@@ -12,8 +12,15 @@ from src.tools.sub_agent import generate_itinerary
 from src.agent.structure import TravelItinerary
 
 
-# --- LLM ---
+# --- LLMs ---
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
+
+# Streaming-enabled LLM
+stream_llm = ChatGoogleGenerativeAI(
+    model="gemini-2.5-flash-lite",
+    api_key=api_key,
+    streaming=True  # ✅ enables streaming tokens
+)
 
 # --- Tools ---
 tools = [
@@ -59,7 +66,7 @@ User request: {input}
 """
 )
 
-# --- Agent ---
+# --- Non-streaming Agent ---
 react_agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
 agent_executor = AgentExecutor.from_agent_and_tools(
     agent=react_agent,
@@ -69,8 +76,18 @@ agent_executor = AgentExecutor.from_agent_and_tools(
     handle_parsing_errors=True
 )
 
+# --- Streaming Agent ---
+stream_react_agent = create_react_agent(llm=stream_llm, tools=tools, prompt=prompt)
+stream_agent_executor = AgentExecutor.from_agent_and_tools(
+    agent=stream_react_agent,
+    tools=tools,
+    verbose=True,
+    max_execution_time=120,
+    handle_parsing_errors=True
+)
 
-# --- Run agent ---
+
+# --- Run Agent (non-streaming) ---
 def run_agent(message: str, session_id: str) -> str:
     agent_with_memory = get_agent_with_memory(agent_executor)
 
@@ -97,3 +114,32 @@ def run_agent(message: str, session_id: str) -> str:
         text = str(response)
 
     return " ".join(text.replace("\n", " ").replace("*", "").split())
+
+
+
+import asyncio
+
+# --- Run Agent (streaming, async word-by-word on ONE line) ---
+async def run_stream_agent(message: str, session_id: str):
+    agent_with_memory = get_agent_with_memory(stream_agent_executor)
+
+    full_output = ""  # Collect final text for Swagger fallback
+
+    async for event in agent_with_memory.astream(
+        {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
+        config={"configurable": {"session_id": session_id}}
+    ):
+        if "output" in event:
+            chunk = str(event["output"])
+            full_output += chunk
+
+            # ✅ Stream word by word with space (no newline)
+            for word in chunk.split():
+                yield word + " "
+                await asyncio.sleep(0.1)  # adjust typing speed
+
+    # ✅ Final marker for Swagger fallback
+    if full_output.strip():
+        cleaned = " ".join(full_output.replace("\n", " ").replace("*", "").split())
+        yield f"\n@@FINAL@@{cleaned}"
+
