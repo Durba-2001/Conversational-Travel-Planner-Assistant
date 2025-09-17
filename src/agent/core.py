@@ -113,10 +113,7 @@ def run_agent(message: str, session_id: str) -> str:
     return " ".join(text.replace("\n", " ").replace("*", "").split())
 
 
-
-
-
-# --- Run Agent (streaming, async word-by-word, preserve "Day 1"/"Day 2" newlines) ---
+# --- Run Agent (streaming) ---
 async def run_stream_agent(message: str, session_id: str):
     agent_with_memory = get_agent_with_memory(stream_agent_executor)
 
