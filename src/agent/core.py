@@ -3,7 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain.prompts import PromptTemplate
 from langchain.tools import Tool
-
+import asyncio
 from src.agent.memory import get_agent_with_memory
 from src.tools.destination import recommend_destinations
 from src.tools.cost import estimate_cost
@@ -19,7 +19,7 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", api_key=api_key)
 stream_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash-lite",
     api_key=api_key,
-    streaming=True  # ✅ enables streaming tokens
+    model_kwargs={"streaming": True}   
 )
 
 # --- Tools ---
@@ -117,29 +117,35 @@ def run_agent(message: str, session_id: str) -> str:
 
 
 
-import asyncio
 
-# --- Run Agent (streaming, async word-by-word on ONE line) ---
+
+# --- Run Agent (streaming, async word-by-word, preserve "Day 1"/"Day 2" newlines) ---
 async def run_stream_agent(message: str, session_id: str):
     agent_with_memory = get_agent_with_memory(stream_agent_executor)
 
-    full_output = ""  # Collect final text for Swagger fallback
+    full_output = ""  # Collect final cleaned text for Swagger fallback
 
     async for event in agent_with_memory.astream(
         {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
         config={"configurable": {"session_id": session_id}}
     ):
         if "output" in event:
-            chunk = str(event["output"])
-            full_output += chunk
+            raw_chunk = str(event["output"])
 
-            # ✅ Stream word by word with space (no newline)
-            for word in chunk.split():
-                yield word + " "
-                await asyncio.sleep(0.1)  # adjust typing speed
+            # Keep newlines, remove other unwanted chars
+            lines = [line.strip().replace("*", "") for line in raw_chunk.split("\n") if line.strip()]
 
-    # ✅ Final marker for Swagger fallback
-    if full_output.strip():
-        cleaned = " ".join(full_output.replace("\n", " ").replace("*", "").split())
-        yield f"\n@@FINAL@@{cleaned}"
+            for line in lines:
+                # Save for Swagger
+                full_output += line + "\n"
 
+                # Stream word by word per line
+                for word in line.split():
+                    yield word + " "
+                    await asyncio.sleep(0.05)
+
+                # After each line, yield a newline
+                yield "\n"
+
+  
+ 
