@@ -39,7 +39,7 @@ async def create_stream_chat(
         except Exception as e:
             yield f"{str(e)}"
 
-    # --- Swagger/Postman fallback → return JSON instead of streaming ---
+
     accept_header = fastapi_request.headers.get("accept", "").lower()
     user_agent = fastapi_request.headers.get("user-agent", "").lower()
     if "application/json" in accept_header or "swagger" in user_agent:
