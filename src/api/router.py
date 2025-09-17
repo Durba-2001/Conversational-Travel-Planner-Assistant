@@ -32,6 +32,7 @@ async def create_stream_chat(
 
     async def event_generator():
         try:
+            yield f"\n[Session ID]: {session_id}\n\n"
             async for chunk in run_stream_agent(request.message, session_id):
                     response_buffer.append(chunk)
                     yield f"{chunk}"

@@ -75,7 +75,6 @@ agent_executor = AgentExecutor.from_agent_and_tools(
     max_execution_time=120,
     handle_parsing_errors=True
 )
-
 # --- Streaming Agent ---
 stream_react_agent = create_react_agent(llm=stream_llm, tools=tools, prompt=prompt)
 stream_agent_executor = AgentExecutor.from_agent_and_tools(
@@ -85,8 +84,6 @@ stream_agent_executor = AgentExecutor.from_agent_and_tools(
     max_execution_time=120,
     handle_parsing_errors=True
 )
-
-
 # --- Run Agent (non-streaming) ---
 def run_agent(message: str, session_id: str) -> str:
     agent_with_memory = get_agent_with_memory(agent_executor)
