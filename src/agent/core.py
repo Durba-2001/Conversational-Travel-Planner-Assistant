@@ -113,33 +113,10 @@ def run_agent(message: str, session_id: str) -> str:
     return " ".join(text.replace("\n", " ").replace("*", "").split())
 
 
-# --- Run Agent (streaming) ---
 async def run_stream_agent(message: str, session_id: str):
-    agent_with_memory = get_agent_with_memory(stream_agent_executor)
-
-    full_output = ""  # Collect final cleaned text for Swagger fallback
-
-    async for event in agent_with_memory.astream(
-        {"input": message, "tool_names": [t.name for t in tools], "tools": tools},
-        config={"configurable": {"session_id": session_id}}
-    ):
-        if "output" in event:
-            raw_chunk = str(event["output"])
-
-            # Keep newlines, remove other unwanted chars
-            lines = [line.strip().replace("*", "") for line in raw_chunk.split("\n") if line.strip()]
-
-            for line in lines:
-                # Save for Swagger
-                full_output += line + "\n"
-
-                # Stream word by word per line
-                for word in line.split():
-                    yield word + " "
-                    await asyncio.sleep(0.05)
-
-                # After each line, yield a newline
-                yield "\n"
-
+    async for chunk in stream_llm.astream(message):
+        if chunk.content:
+            cleaned = chunk.content.replace("*", "").replace("\n", " ")
+            for word in cleaned.split():
+                yield word + " "
   
- 
